@@ -1,24 +1,39 @@
+# app.py
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 
-# Create an instance of the Flask web application
+# Import the functions from our new analyzer file
+from analyzer import check_communicator, check_url, generate_report
+
+# Initialize the Flask application
 app = Flask(__name__)
 
-# This defines a "route". It's a specific URL endpoint.
-# When Twilio sends a message, it will send it to our URL + "/webhook".
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    # Flask gives us the 'request' object, which contains all the data
-    # sent by Twilio. We look inside its 'values' for the 'Body' of the message.
+    """
+    This is the main endpoint that Twilio will call when a message comes in.
+    """
+    # Get the incoming message details from Twilio
     incoming_msg = request.values.get('Body', '')
+    sender_phone_number = request.values.get('From', '')
 
-    print(f"Received message: '{incoming_msg}'") # This prints to our server logs for debugging
+    print(f"Analyzing message: '{incoming_msg}' from {sender_phone_number}")
 
-    # We create an empty response object using the Twilio library
+    # --- Run our analysis ---
+    # 1. Check the sender's reputation
+    report_count = check_communicator(sender_phone_number)
+    
+    # 2. Check for suspicious URLs in the message
+    is_suspicious_url = check_url(incoming_msg)
+
+    # 3. Generate the final user-facing report
+    report_message = generate_report(report_count, is_suspicious_url)
+
+    # --- Create and send the reply ---
     response = MessagingResponse()
+    response.message(report_message)
 
-    # We add a <Message> tag to our response with the text we want to send back
-    response.message("Astra connection successful. Welcome!")
-
-    # We convert the response object to a string and send it back to Twilio
     return str(response)
+
+# Note: The if __name__ == '__main__': block is not needed for Render deployment
+# but is good practice for local testing. We'll leave it out for simplicity.
