@@ -24,7 +24,7 @@ def check_communicator(phone_number: str) -> int:
         # The 'returning="minimal"' means we don't need the data back, which is faster
         data = supabase.table('communicators').update({
             'report_count': 1 # This is a placeholder, we will use an RPC function for atomic increment
-        }).eq('sender_hash', sender_hash).execute(returning="minimal")
+        }).eq('sender_hash', sender_hash).execute()
         
         # Atomically increment the report_count using a Postgres function
         # This is safer for handling many requests at once
