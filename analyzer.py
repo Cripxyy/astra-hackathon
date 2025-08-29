@@ -46,34 +46,47 @@ def check_communicator(phone_number: str) -> int:
         print(f"Error interacting with Supabase: {e}")
         return 0 # Return 0 if there's a database error
 
+# analyzer.py (updated check_url function)
+
 def check_url(message: str) -> bool:
     """
     Finds the first URL in a message and checks if its domain is new.
     Returns True if suspicious (new), False otherwise.
     """
+    print("---- Starting URL Check ----")
     # Use regular expressions to find the first http or https URL in the message
     match = re.search(r'https?://[^\s]+', message)
     if not match:
+        print("No URL found in the message.")
         return False # No URL found
 
     url = match.group(0)
+    print(f"URL found: {url}")
+    
     try:
         # Get domain information
         domain_info = whois.whois(url)
+        print(f"WHOIS info retrieved: {domain_info}")
+
         creation_date = domain_info.creation_date
+        print(f"Raw creation_date from WHOIS: {creation_date}")
 
         # Sometimes creation_date is a list, so we handle that
         if isinstance(creation_date, list):
             creation_date = creation_date[0]
         
+        print(f"Final creation_date to be checked: {creation_date}")
+
         # Check if the domain was created in the last 90 days
         if creation_date and (datetime.now() - creation_date) < timedelta(days=90):
-            print(f"Suspicious URL found: {url} (created recently)")
+            print("!!! Domain is NEW. Flagging as suspicious.")
             return True # Domain is new, so it's suspicious
+        else:
+            print("Domain is old. Not suspicious.")
             
     except Exception as e:
-        print(f"Could not check URL {url}: {e}")
-        # If we can't check the URL, we'll assume it's not suspicious for now
+        print(f"!!! An error occurred while checking the URL: {e}")
+        # If we can't check the URL, we'll assume it's not suspicious
         return False
         
     return False
