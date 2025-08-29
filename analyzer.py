@@ -1,10 +1,12 @@
 # analyzer.py
+# Make sure 'requests' is now imported at the top of your file
+import requests 
 from datetime import datetime, timedelta, timezone 
 import os
 import re
-import whois11 as whois
+# We don't need 'whois11' anymore, you can delete that import line if you want
+# import whois11 as whois
 import hashlib
-from datetime import datetime, timedelta
 from supabase import create_client, Client
 
 # --- Initialize the Supabase client ---
@@ -51,43 +53,48 @@ def check_communicator(phone_number: str) -> int:
 
 def check_url(message: str) -> bool:
     """
-    Finds the first URL in a message and checks if its domain is new.
-    Returns True if suspicious (new), False otherwise.
+    Finds a URL and uses an external API to check its domain age.
     """
-    print("---- Starting URL Check ----")
-    match = re.search(r'https?://[^\s]+', message)
+    print("---- Starting URL Check using API ----")
+    match = re.search(r'https?://([a-zA-Z0-9.-]+)', message)
     if not match:
-        print("No URL found in the message.")
+        print("No domain found in the message.")
         return False
 
-    url = match.group(0)
-    print(f"URL found: {url}")
-    
+    domain_name = match.group(1)
+    print(f"Domain found: {domain_name}")
+
     try:
-        domain_info = whois.whois(url)
-        
-        # --- THIS IS THE NEW DEBUGGING LINE ---
-        # Let's print the entire raw text to see what we're getting
-        print(f"------ RAW WHOIS TEXT START ------\n{str(domain_info)}\n------ RAW WHOIS TEXT END ------")
+        api_key = os.environ.get("WHOIS_API_KEY")
+        if not api_key:
+            print("!!! WHOIS_API_KEY environment variable not set.")
+            return False
 
-        creation_date = domain_info.creation_date
-        print(f"Parsed creation_date from WHOIS: {creation_date}")
+        # Construct the API request URL
+        api_url = f"https://www.whoisxmlapi.com/whoisserver/WhoisService?apiKey={api_key}&domainName={domain_name}&outputFormat=JSON"
 
-        if isinstance(creation_date, list):
-            creation_date = creation_date[0]
-        
-        if creation_date:
-            now_utc = datetime.now(timezone.utc)
-            aware_creation_date = creation_date.replace(tzinfo=timezone.utc)
+        # Make the web request to the API
+        response = requests.get(api_url)
+        data = response.json()
+
+        # Safely get the creation date from the JSON response
+        creation_date_str = data.get("WhoisRecord", {}).get("createdDate")
+        print(f"API returned creation date: {creation_date_str}")
+
+        if creation_date_str:
+            # The date comes as a string, so we need to parse it into a datetime object
+            # Example format: 2025-08-15T10:00:00Z
+            creation_date = datetime.fromisoformat(creation_date_str.replace("Z", "+00:00"))
             
-            if (now_utc - aware_creation_date) < timedelta(days=90):
+            now_utc = datetime.now(timezone.utc)
+            if (now_utc - creation_date) < timedelta(days=90):
                 print("!!! Domain is NEW. Flagging as suspicious.")
                 return True
         
-        print("Domain is old or has no date. Not suspicious.")
-            
+        print("Domain is old or API call failed. Not suspicious.")
+
     except Exception as e:
-        print(f"!!! An error occurred while checking the URL: {e}")
+        print(f"!!! An error occurred while using the API: {e}")
         return False
         
     return False
