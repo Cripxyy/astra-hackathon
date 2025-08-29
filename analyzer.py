@@ -56,7 +56,8 @@ def check_url(message: str) -> bool:
     Finds a URL and uses an external API to check its domain age.
     """
     print("---- Starting URL Check using API ----")
-    match = re.search(r'https?://([a-zA-Z0-9.-]+)', message)
+    # This new regex is better at extracting the core domain from a full URL
+    match = re.search(r'https?://(?:www\.)?([^/]+)', message)
     if not match:
         print("No domain found in the message.")
         return False
@@ -70,22 +71,16 @@ def check_url(message: str) -> bool:
             print("!!! WHOIS_API_KEY environment variable not set.")
             return False
 
-        # Construct the API request URL
         api_url = f"https://www.whoisxmlapi.com/whoisserver/WhoisService?apiKey={api_key}&domainName={domain_name}&outputFormat=JSON"
-
-        # Make the web request to the API
+        
         response = requests.get(api_url)
         data = response.json()
 
-        # Safely get the creation date from the JSON response
         creation_date_str = data.get("WhoisRecord", {}).get("createdDate")
         print(f"API returned creation date: {creation_date_str}")
 
         if creation_date_str:
-            # The date comes as a string, so we need to parse it into a datetime object
-            # Example format: 2025-08-15T10:00:00Z
             creation_date = datetime.fromisoformat(creation_date_str.replace("Z", "+00:00"))
-            
             now_utc = datetime.now(timezone.utc)
             if (now_utc - creation_date) < timedelta(days=90):
                 print("!!! Domain is NEW. Flagging as suspicious.")
