@@ -1,4 +1,5 @@
 # analyzer.py
+from datetime import datetime, timedelta, timezone 
 import os
 import re
 import whois
@@ -53,40 +54,42 @@ def check_url(message: str) -> bool:
     Finds the first URL in a message and checks if its domain is new.
     Returns True if suspicious (new), False otherwise.
     """
+    # The debug print statements are still here so we can confirm the fix
     print("---- Starting URL Check ----")
-    # Use regular expressions to find the first http or https URL in the message
     match = re.search(r'https?://[^\s]+', message)
     if not match:
         print("No URL found in the message.")
-        return False # No URL found
+        return False
 
     url = match.group(0)
     print(f"URL found: {url}")
     
     try:
-        # Get domain information
         domain_info = whois.whois(url)
-        print(f"WHOIS info retrieved: {domain_info}")
-
         creation_date = domain_info.creation_date
         print(f"Raw creation_date from WHOIS: {creation_date}")
 
-        # Sometimes creation_date is a list, so we handle that
         if isinstance(creation_date, list):
             creation_date = creation_date[0]
         
-        print(f"Final creation_date to be checked: {creation_date}")
+        # --- THIS IS THE NEW, CORRECTED LOGIC ---
+        if creation_date:
+            # Get the current time as a timezone-aware object in UTC
+            now_utc = datetime.now(timezone.utc)
+            
+            # Make the creation_date timezone-aware by attaching the UTC timezone
+            aware_creation_date = creation_date.replace(tzinfo=timezone.utc)
+            print(f"Comparing now_utc ({now_utc}) vs aware_creation_date ({aware_creation_date})")
 
-        # Check if the domain was created in the last 90 days
-        if creation_date and (datetime.now() - creation_date) < timedelta(days=90):
-            print("!!! Domain is NEW. Flagging as suspicious.")
-            return True # Domain is new, so it's suspicious
-        else:
-            print("Domain is old. Not suspicious.")
+            # Now we can safely compare two timezone-aware dates
+            if (now_utc - aware_creation_date) < timedelta(days=90):
+                print("!!! Domain is NEW. Flagging as suspicious.")
+                return True
+        
+        print("Domain is old or has no date. Not suspicious.")
             
     except Exception as e:
         print(f"!!! An error occurred while checking the URL: {e}")
-        # If we can't check the URL, we'll assume it's not suspicious
         return False
         
     return False
