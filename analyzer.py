@@ -54,7 +54,6 @@ def check_url(message: str) -> bool:
     Finds the first URL in a message and checks if its domain is new.
     Returns True if suspicious (new), False otherwise.
     """
-    # The debug print statements are still here so we can confirm the fix
     print("---- Starting URL Check ----")
     match = re.search(r'https?://[^\s]+', message)
     if not match:
@@ -66,22 +65,21 @@ def check_url(message: str) -> bool:
     
     try:
         domain_info = whois.whois(url)
+        
+        # --- THIS IS THE NEW DEBUGGING LINE ---
+        # Let's print the entire raw text to see what we're getting
+        print(f"------ RAW WHOIS TEXT START ------\n{str(domain_info)}\n------ RAW WHOIS TEXT END ------")
+
         creation_date = domain_info.creation_date
-        print(f"Raw creation_date from WHOIS: {creation_date}")
+        print(f"Parsed creation_date from WHOIS: {creation_date}")
 
         if isinstance(creation_date, list):
             creation_date = creation_date[0]
         
-        # --- THIS IS THE NEW, CORRECTED LOGIC ---
         if creation_date:
-            # Get the current time as a timezone-aware object in UTC
             now_utc = datetime.now(timezone.utc)
-            
-            # Make the creation_date timezone-aware by attaching the UTC timezone
             aware_creation_date = creation_date.replace(tzinfo=timezone.utc)
-            print(f"Comparing now_utc ({now_utc}) vs aware_creation_date ({aware_creation_date})")
-
-            # Now we can safely compare two timezone-aware dates
+            
             if (now_utc - aware_creation_date) < timedelta(days=90):
                 print("!!! Domain is NEW. Flagging as suspicious.")
                 return True
