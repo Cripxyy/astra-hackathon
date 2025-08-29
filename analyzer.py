@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone 
 import os
 import re
-import whois
+import whois11 as whois
 import hashlib
 from datetime import datetime, timedelta
 from supabase import create_client, Client
